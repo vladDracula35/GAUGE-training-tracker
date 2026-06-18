@@ -4,6 +4,8 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Json;
+using System.Threading.Tasks;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -35,7 +37,7 @@ public partial class MainWindowViewModel : ViewModelBase
     // --- ЕКРАН ТРЕНУВАННЯ ---
     public ObservableCollection<WorkoutSetModel> WorkoutSets { get; } = new();
 
-    [ObservableProperty] private string _selectedExercise;
+    [ObservableProperty] private string _selectedExercise = string.Empty;
     [ObservableProperty] private int _currentReps = 0;
     [ObservableProperty] private int _currentRest = 60;
     [ObservableProperty] private string _currentNotes = "";
@@ -345,39 +347,27 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand] public void CancelFinishWorkout() => IsFinishDialogVisible = false;
 
     [RelayCommand]
-    public void ConfirmFinishWorkout()
+    public async Task ConfirmExportCommand()
     {
-        IsFinishDialogVisible = false;
-        if (!WorkoutSets.Any()) return;
-
-        string appFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "GAUGEData");
-        Directory.CreateDirectory(appFolder);
-        string timestamp = DateTime.Now.ToString("yyyy-MM-dd_HH-mm");
-
-        // Зберігаємо JSON та Markdown
-        File.WriteAllText(Path.Combine(appFolder, $"Workout_{timestamp}.json"), JsonSerializer.Serialize(WorkoutSets, new JsonSerializerOptions { WriteIndented = true }));
-        
-        var sb = new StringBuilder();
-        sb.AppendLine($"# Тренування - {DateTime.Now:dd.MM.yyyy HH:mm}\n");
-        int setNum = 1;
-        foreach (var set in WorkoutSets)
+        var folderPicker = new FolderPickerOpenOptions
         {
-            if (!set.Exercises.Any()) continue;
-            sb.AppendLine($"## Підхід {setNum++}");
-            foreach (var ex in set.Exercises)
+            Title = "Select a destination folder"
+        };
+
+        if (await StorageProvider.OpenFolderPickerAsync(folderPicker))
+        {
+            string selectedFolder = folderPicker.ResultPath;
+
+            foreach (var item in AvailableWorkouts.Where(i => i.IsSelected))
             {
-                sb.AppendLine($"- **{ex.Name}**: {ex.Reps} повт. (Відпочинок: {ex.RestSeconds}s)");
-                if (!string.IsNullOrWhiteSpace(ex.Notes)) sb.AppendLine($"  > *Відчуття: {ex.Notes}*");
+                string sourceFile = Path.Combine(Environment.GetFolderPath(item.FileName.Contains(".json") ? Environment.SpecialFolder.LocalApplicationData : Environment.SpecialFolder.Personal), item.FileName);
+                string destinationFile = Path.Combine(selectedFolder, item.FileName);
+
+                File.Copy(sourceFile, destinationFile, true);
             }
-            sb.AppendLine();
+
+            IsExportDialogVisible = false;
         }
-        File.WriteAllText(Path.Combine(appFolder, $"Workout_{timestamp}.md"), sb.ToString());
-
-        WorkoutSets.Clear(); 
-        DeleteAutosave();
-        IsWorkoutActive = false; // ПОВЕРТАЄМОСЬ НА ГОЛОВНИЙ ЕКРАН
-        LoadHistory(); // Оновлюємо список
-
     }
 
     [RelayCommand]
@@ -403,29 +393,5 @@ public partial class MainWindowViewModel : ViewModelBase
     public void CancelExportCommand()
     {
         IsExportDialogVisible = false;
-    }
-
-    [RelayCommand]
-    public async void ConfirmExportCommand()
-    {
-        var folderPicker = new FolderPicker
-        {
-            Title = "Select a destination folder"
-        };
-
-        if (await folderPicker.OpenAsync())
-        {
-            string selectedFolder = folderPicker.ResultPath;
-
-            foreach (var item in AvailableWorkouts.Where(i => i.IsSelected))
-            {
-                string sourceFile = Path.Combine(Environment.GetFolderPath(item.FileName.Contains(".json") ? Environment.SpecialFolder.LocalApplicationData : Environment.SpecialFolder.Personal), item.FileName);
-                string destinationFile = Path.Combine(selectedFolder, item.FileName);
-
-                File.Copy(sourceFile, destinationFile, true);
-            }
-
-            IsExportDialogVisible = false;
-        }
     }
 }
