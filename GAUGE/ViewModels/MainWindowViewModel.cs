@@ -5,8 +5,8 @@ using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Platform.Storage;
-using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GAUGE.Models;
@@ -349,19 +349,26 @@ public partial class MainWindowViewModel : ViewModelBase
     [RelayCommand]
     public async Task ConfirmExportCommand()
     {
-        var folderPicker = new FolderPickerOpenOptions
-        {
-            Title = "Select a destination folder"
-        };
+        var lifetime = Avalonia.Application.Current?.ApplicationLifetime as Avalonia.Controls.ApplicationLifetimes.ISingleViewApplicationLifetime;
+        var topLevel = Avalonia.Controls.TopLevel.GetTopLevel(lifetime?.MainView);
+        if (topLevel == null) return;
+        var storageProvider = topLevel.StorageProvider;
 
-        if (await StorageProvider.OpenFolderPickerAsync(folderPicker))
-        {
-            string selectedFolder = folderPicker.ResultPath;
+        var folders = await storageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions 
+        { 
+            Title = "Select Export Folder", 
+            AllowMultiple = false 
+        });
 
+        if (folders != null && folders.Count > 0)
+        {
+            string targetFolderPath = folders[0].TryGetLocalPath() ?? folders[0].Path.LocalPath;
+            
+            // Now loop through AvailableWorkouts where IsSelected == true and copy files to targetFolderPath
             foreach (var item in AvailableWorkouts.Where(i => i.IsSelected))
             {
                 string sourceFile = Path.Combine(Environment.GetFolderPath(item.FileName.Contains(".json") ? Environment.SpecialFolder.LocalApplicationData : Environment.SpecialFolder.Personal), item.FileName);
-                string destinationFile = Path.Combine(selectedFolder, item.FileName);
+                string destinationFile = Path.Combine(targetFolderPath, item.FileName);
 
                 File.Copy(sourceFile, destinationFile, true);
             }
