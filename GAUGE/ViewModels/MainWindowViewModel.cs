@@ -11,7 +11,7 @@ using GAUGE.Models;
 
 namespace GAUGE.ViewModels;
 
-public class ExportItem : ObservableObject
+public partial class ExportItem : ObservableObject
 {
     public string FileName { get; set; } = string.Empty;
     [ObservableProperty] private bool _isSelected;
