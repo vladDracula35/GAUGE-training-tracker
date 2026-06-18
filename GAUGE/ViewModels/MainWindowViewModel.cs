@@ -11,6 +11,12 @@ using GAUGE.Models;
 
 namespace GAUGE.ViewModels;
 
+public class WorkoutHistoryModel
+{
+    public string Title { get; set; } = string.Empty;
+    public string Summary { get; set; } = string.Empty;
+}
+
 public partial class ExportItem : ObservableObject
 {
     public string FileName { get; set; } = string.Empty;
