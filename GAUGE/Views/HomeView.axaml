@@ -1,0 +1,71 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GAUGE.ViewModels"
+             x:DataType="vm:MainWindowViewModel"
+             x:Class="GAUGE.Views.HomeView">
+
+    <Panel Background="Transparent" Focusable="True">
+
+        <Border ZIndex="2000" Background="#E6000000" IsVisible="{Binding IsAutosaveDialogVisible}">
+    <Border Background="#2A2A2A" CornerRadius="40" Padding="30" HorizontalAlignment="Stretch" VerticalAlignment="Center" BorderBrush="#404040" BorderThickness="1" Margin="30">
+        <StackPanel Spacing="25">
+            <TextBlock Text="ЗНАЙДЕНО НЕЗАКІНЧЕНЕ ТРЕНУВАННЯ" FontSize="20" FontWeight="Black" Foreground="#FFFFFF" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"/>
+            <TextBlock Text="Бажаєш повернутись до виконання вправ і продовжити прогрес?" FontSize="14" Foreground="#888888" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"/>
+            <Grid ColumnDefinitions="*, 20, *">
+                <Button Grid.Column="0" Height="60" CornerRadius="20" Background="#800020" Command="{Binding CancelRestoreWorkoutCommand}" ClickMode="Press" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
+                    <TextBlock Text="НІ" FontSize="20" FontWeight="Bold" Foreground="White"/>
+                </Button>
+                <Button Grid.Column="2" Height="60" CornerRadius="20" Background="#2B4E2B" Command="{Binding ConfirmRestoreWorkoutCommand}" ClickMode="Press" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
+                    <TextBlock Text="ТАК" FontSize="20" FontWeight="Bold" Foreground="White"/>
+                </Button>
+            </Grid>
+        </StackPanel>
+    </Border>
+</Border>
+        <ScrollViewer>
+            
+            <StackPanel Spacing="30" Margin="25,40,25,25">
+                
+                <Border Height="90" CornerRadius="25" BorderBrush="#404040" BorderThickness="2" Background="#2A2A2A">
+                    <TextBlock Text="GAUGE" FontSize="36" FontWeight="Black" Foreground="#FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center" LetterSpacing="8"/>
+                </Border>
+
+                <TextBlock Text="Останні тренування" Foreground="#888888" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,0,0,-15"/>
+
+                <Border Background="#222222" CornerRadius="25" Padding="15" BorderBrush="#333333" BorderThickness="1">
+                    <ScrollViewer MaxHeight="250" AllowAutoHide="False">
+                        <ItemsControl ItemsSource="{Binding PastWorkouts}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="#2A2A2A" CornerRadius="15" Padding="15" Margin="0,0,10,10" BorderBrush="#404040" BorderThickness="1">
+                                        <StackPanel Spacing="5">
+                                            <TextBlock Text="{Binding Title}" Foreground="#e3dad1" FontSize="16" FontWeight="Bold"/>
+                                            <TextBlock Text="{Binding Summary}" Foreground="#888888" FontSize="13" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Border>
+
+               <Button Command="{Binding StartNewWorkoutCommand}" Width="160" Height="160" CornerRadius="80" 
+                        Background="Transparent" BorderThickness="0" HorizontalAlignment="Center" Margin="0,10" ClickMode="Press">
+                    <Panel>
+                        <Image Source="avares://GAUGE/Assets/cross_bg.png" Stretch="Uniform" /> 
+                        
+                        <Image Source="avares://GAUGE/Assets/main_cross.png" Stretch="Uniform" /> 
+                    </Panel>
+                </Button>
+
+                <Border Background="#2A2A2A" CornerRadius="25" Padding="20" BorderBrush="#404040" BorderThickness="1">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="ПОРАДА СЕНСЕЯ" Foreground="#800020" FontSize="12" FontWeight="Black" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{Binding AiQuote}" Foreground="#e3dad1" FontSize="14" FontStyle="Italic" TextAlignment="Center" TextWrapping="Wrap"/>
+                    </StackPanel>
+                </Border>
+                
+            </StackPanel>
+        </ScrollViewer>
+    </Panel>
+</UserControl>
