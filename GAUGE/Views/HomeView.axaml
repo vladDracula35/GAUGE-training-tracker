@@ -5,25 +5,24 @@
              x:Class="GAUGE.Views.HomeView">
 
     <Panel Background="Transparent" Focusable="True">
-
         <Border ZIndex="2000" Background="#E6000000" IsVisible="{Binding IsAutosaveDialogVisible}">
-    <Border Background="#2A2A2A" CornerRadius="40" Padding="30" HorizontalAlignment="Stretch" VerticalAlignment="Center" BorderBrush="#404040" BorderThickness="1" Margin="30">
-        <StackPanel Spacing="25">
-            <TextBlock Text="ЗНАЙДЕНО НЕЗАКІНЧЕНЕ ТРЕНУВАННЯ" FontSize="20" FontWeight="Black" Foreground="#FFFFFF" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"/>
-            <TextBlock Text="Бажаєш повернутись до виконання вправ і продовжити прогрес?" FontSize="14" Foreground="#888888" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"/>
-            <Grid ColumnDefinitions="*, 20, *">
-                <Button Grid.Column="0" Height="60" CornerRadius="20" Background="#800020" Command="{Binding CancelRestoreWorkoutCommand}" ClickMode="Press" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
-                    <TextBlock Text="НІ" FontSize="20" FontWeight="Bold" Foreground="White"/>
-                </Button>
-                <Button Grid.Column="2" Height="60" CornerRadius="20" Background="#2B4E2B" Command="{Binding ConfirmRestoreWorkoutCommand}" ClickMode="Press" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
-                    <TextBlock Text="ТАК" FontSize="20" FontWeight="Bold" Foreground="White"/>
-                </Button>
-            </Grid>
-        </StackPanel>
-    </Border>
-</Border>
+            <Border Background="#2A2A2A" CornerRadius="40" Padding="30" HorizontalAlignment="Stretch" VerticalAlignment="Center" BorderBrush="#404040" BorderThickness="1" Margin="30">
+                <StackPanel Spacing="25">
+                    <TextBlock Text="ЗНАЙДЕНО НЕЗАКІНЧЕНЕ ТРЕНУВАННЯ" FontSize="20" FontWeight="Black" Foreground="#FFFFFF" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"/>
+                    <TextBlock Text="Бажаєш повернутись до виконання вправ і продовжити прогрес?" FontSize="14" Foreground="#888888" HorizontalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap"/>
+                    <Grid ColumnDefinitions="*, 20, *">
+                        <Button Grid.Column="0" Height="60" CornerRadius="20" Background="#800020" Command="{Binding CancelRestoreWorkoutCommand}" ClickMode="Press" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
+                            <TextBlock Text="НІ" FontSize="20" FontWeight="Bold" Foreground="White"/>
+                        </Button>
+                        <Button Grid.Column="2" Height="60" CornerRadius="20" Background="#2B4E2B" Command="{Binding ConfirmRestoreWorkoutCommand}" ClickMode="Press" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalContentAlignment="Center">
+                            <TextBlock Text="ТАК" FontSize="20" FontWeight="Bold" Foreground="White"/>
+                        </Button>
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </Border>
+
         <ScrollViewer>
-            
             <StackPanel Spacing="30" Margin="25,40,25,25">
                 
                 <Border Height="90" CornerRadius="25" BorderBrush="#404040" BorderThickness="2" Background="#2A2A2A">
@@ -49,7 +48,7 @@
                     </ScrollViewer>
                 </Border>
 
-               <Button Command="{Binding StartNewWorkoutCommand}" Width="160" Height="160" CornerRadius="80" 
+                <Button Command="{Binding StartNewWorkoutCommand}" Width="160" Height="160" CornerRadius="80" 
                         Background="Transparent" BorderThickness="0" HorizontalAlignment="Center" Margin="0,10" ClickMode="Press">
                     <Panel>
                         <Image Source="avares://GAUGE/Assets/cross_bg.png" Stretch="Uniform" /> 
@@ -64,8 +63,39 @@
                         <TextBlock Text="{Binding AiQuote}" Foreground="#e3dad1" FontSize="14" FontStyle="Italic" TextAlignment="Center" TextWrapping="Wrap"/>
                     </StackPanel>
                 </Border>
-                
+
+                <!-- Add Export Workouts button -->
+                <Button Command="{Binding OpenExportMenuCommand}" Width="160" Height="50" CornerRadius="25" 
+                        Background="#800020" BorderThickness="0" HorizontalAlignment="Center" Margin="0,10" ClickMode="Press">
+                    <TextBlock Text="Export Workouts" FontSize="14" FontWeight="Bold" Foreground="White"/>
+                </Button>
+
             </StackPanel>
         </ScrollViewer>
+
+        <!-- Add Export Dialog -->
+        <Border Background="#2A2A2A" CornerRadius="25" Padding="30" HorizontalAlignment="Stretch" VerticalAlignment="Bottom" IsVisible="{Binding IsExportDialogVisible}" Margin="0,0,0,10">
+            <StackPanel Spacing="25">
+                <TextBlock Text="Select Workouts to Export" FontSize="20" FontWeight="Black" Foreground="#FFFFFF" HorizontalAlignment="Center"/>
+                <ListBox ItemsSource="{Binding AvailableWorkouts}">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <CheckBox Content="{Binding FileName}" IsChecked="{Binding IsSelected, Mode=TwoWay}"/>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                    <Button Command="{Binding CancelExportCommand}" Width="100" Height="40" CornerRadius="25" 
+                            Background="#800020" BorderThickness="0" Margin="0,10" ClickMode="Press">
+                        <TextBlock Text="Cancel" FontSize="14" FontWeight="Bold" Foreground="White"/>
+                    </Button>
+                    <Button Command="{Binding ConfirmExportCommand}" Width="100" Height="40" CornerRadius="25" 
+                            Background="#2B4E2B" BorderThickness="0" Margin="10,10" ClickMode="Press">
+                        <TextBlock Text="Export" FontSize="14" FontWeight="Bold" Foreground="White"/>
+                    </Button>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
     </Panel>
 </UserControl>
