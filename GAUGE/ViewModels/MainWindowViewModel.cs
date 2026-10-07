@@ -11,6 +11,8 @@ using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GAUGE.Models;
+using GAUGE.Services;
+using System.Collections.Generic;
 
 namespace GAUGE.ViewModels;
 
@@ -18,6 +20,7 @@ public class WorkoutHistoryModel
 {
     public string Title { get; set; } = string.Empty;
     public string Summary { get; set; } = string.Empty;
+    public string FilePath { get; set; } = string.Empty;
 }
 
 public partial class ExportItem : ObservableObject
@@ -29,25 +32,59 @@ public partial class ExportItem : ObservableObject
 public partial class MainWindowViewModel : ViewModelBase
 {
     // --- КЕРУВАННЯ ЕКРАНАМИ ---
-    [ObservableProperty] private bool _isWorkoutActive = false; // Якщо false - показуємо Головне меню
+    [ObservableProperty] private bool _isWorkoutActive = false;
 
     // --- ГОЛОВНИЙ ЕКРАН ---
     public ObservableCollection<WorkoutHistoryModel> PastWorkouts { get; } = new();
     [ObservableProperty] private string _aiQuote = "Сьогодні ти переміг лінь. Завтра ти переможеш вагу.";
+    // Календар активності
+    public ObservableCollection<CalendarDayModel> CurrentMonthDays { get; } = new();
+    [ObservableProperty] private string _currentMonthTitle = string.Empty;
+    private readonly string _activityLogFilePath;
+    private DateTime _displayDate = DateTime.Now;
+
+    [RelayCommand]
+    public void PreviousMonth()
+    {
+        _displayDate = _displayDate.AddMonths(-1);
+        BuildCalendar();
+    }
+
+    [RelayCommand]
+    public void NextMonth()
+    {
+        _displayDate = _displayDate.AddMonths(1);
+        BuildCalendar();
+    }
 
     // --- ЕКРАН ТРЕНУВАННЯ ---
     public ObservableCollection<WorkoutSetModel> WorkoutSets { get; } = new();
 
-    [ObservableProperty] private string _selectedExercise = string.Empty;
+    // Списки вправ: повний та відфільтрований
+    public ObservableCollection<ExerciseModel> AllExercises { get; } = new();
+    public ObservableCollection<ExerciseModel> FilteredExercises { get; } = new();
+
+    [ObservableProperty] private ExerciseModel? _selectedExerciseItem;
+    [ObservableProperty] private string _selectedExercise = "Виберіть вправу";
+    [ObservableProperty] private string _searchExerciseText = string.Empty;
+    [ObservableProperty] private string _selectedCategoryFilter = "Всі";
+    [ObservableProperty] private string _newExerciseName = string.Empty;
+    [ObservableProperty] private string _newExerciseCategory = "Верх";
+
     [ObservableProperty] private int _currentReps = 0;
     [ObservableProperty] private int _currentRest = 60;
-    [ObservableProperty] private string _currentNotes = "";
+    [ObservableProperty] private string _currentNotes = string.Empty;
 
     [ObservableProperty] private bool _isMenuOpen = false;
     [ObservableProperty] private bool _isRepOverlayVisible = false;
     [ObservableProperty] private bool _isRestOverlayVisible = false;
     [ObservableProperty] private bool _isFinishDialogVisible = false;
-
+    
+    [ObservableProperty] private bool _isWorkoutDetailsVisible = false;
+    [ObservableProperty] private string _detailsTitle = string.Empty;
+    public ObservableCollection<WorkoutSetModel> DetailsSets { get; } = new();
+    private string _currentDetailsFilePath = string.Empty;
+    
     // Таймер
     private DispatcherTimer _timer;
     private int _elapsedSeconds = 0;
@@ -55,13 +92,14 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty] private bool _isTimerRunning = false;
     [ObservableProperty] private string _playPauseIcon = "▶";
 
-    private readonly string _autosaveFilePath = Path.Combine(
+    private readonly string _dataDirectory = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), 
-        "GAUGEData", 
-        "autosave_workout.json"
+        "GAUGEData"
     );
 
-    // Властивість для показу вікна відновлення
+    private readonly string _autosaveFilePath;
+    private readonly string _filePath;
+
     [ObservableProperty] private bool _isAutosaveDialogVisible = false;
 
     public ObservableCollection<ExportItem> AvailableWorkouts { get; } = new();
@@ -69,6 +107,10 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public MainWindowViewModel()
     {
+        _autosaveFilePath = Path.Combine(_dataDirectory, "autosave_workout.json");
+        _filePath = Path.Combine(_dataDirectory, "exercises_list.txt");
+        _activityLogFilePath = Path.Combine(_dataDirectory, "activity_log.json");
+
         _timer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         _timer.Tick += (s, e) =>
         {
@@ -78,8 +120,8 @@ public partial class MainWindowViewModel : ViewModelBase
 
         LoadExercisesFromFile();
         LoadHistory();
+        BuildCalendar();
 
-        // ПЕРЕВІРКА НА АВТОЗБЕРЕЖЕННЯ ПРИ СТАРТІ
         if (File.Exists(_autosaveFilePath))
         {
             try
@@ -87,11 +129,392 @@ public partial class MainWindowViewModel : ViewModelBase
                 string jsonString = File.ReadAllText(_autosaveFilePath);
                 if (!string.IsNullOrWhiteSpace(jsonString) && jsonString != "[]")
                 {
-                    // Показуємо діалогове вікно відновлення
                     IsAutosaveDialogVisible = true;
                 }
             }
             catch { }
+        }
+    }
+
+    // --- РЕАКЦІЯ НА ЗМІНУ ВЛАСТИВОСТЕЙ ---
+    partial void OnSelectedExerciseItemChanged(ExerciseModel? value)
+    {
+        if (value != null)
+        {
+            SelectedExercise = value.Name;
+        }
+    }
+
+    partial void OnSearchExerciseTextChanged(string value) => ApplyExerciseFilter();
+    partial void OnSelectedCategoryFilterChanged(string value) => ApplyExerciseFilter();
+
+    [RelayCommand]
+    public void SelectCategory(string category)
+    {
+        SelectedCategoryFilter = category;
+    }
+
+    public void ApplyExerciseFilter()
+    {
+        var query = AllExercises.AsEnumerable();
+
+        if (!string.Equals(SelectedCategoryFilter, "Всі", StringComparison.OrdinalIgnoreCase))
+        {
+            query = query.Where(e => string.Equals(e.Category, SelectedCategoryFilter, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (!string.IsNullOrWhiteSpace(SearchExerciseText))
+        {
+            query = query.Where(e => e.Name.Contains(SearchExerciseText, StringComparison.OrdinalIgnoreCase));
+        }
+
+        // Остання використана вправа піднімається на самий верх!
+        var sorted = query
+            .OrderByDescending(e => e.LastUsedAt)
+            .ThenBy(e => e.Name)
+            .ToList();
+
+        FilteredExercises.Clear();
+        foreach (var item in sorted)
+        {
+            FilteredExercises.Add(item);
+        }
+    }
+
+    public void MarkExerciseAsUsed(string exerciseName)
+    {
+        var item = AllExercises.FirstOrDefault(e => e.Name.Equals(exerciseName, StringComparison.OrdinalIgnoreCase));
+        if (item != null)
+        {
+            item.LastUsedAt = DateTime.Now;
+            SaveExercisesToFile();
+            ApplyExerciseFilter();
+        }
+    }
+
+    private void LoadExercisesFromFile()
+    {
+        try
+        {
+            if (!Directory.Exists(_dataDirectory))
+            {
+                Directory.CreateDirectory(_dataDirectory);
+            }
+
+            if (!File.Exists(_filePath))
+            {
+                var defaults = new[]
+                {
+                    "Підтягування на турніку|Верх",
+                    "Віджимання на брусах|Верх",
+                    "Бій з тінню|Кор",
+                    "Робота на мішку|Верх",
+                    "Присідання|Ноги"
+                };
+                File.WriteAllLines(_filePath, defaults);
+            }
+
+            var lines = File.ReadAllLines(_filePath);
+            AllExercises.Clear();
+            foreach (var line in lines.Where(l => !string.IsNullOrWhiteSpace(l)))
+            {
+                var parts = line.Split('|');
+                var name = parts[0].Trim();
+                var cat = parts.Length > 1 ? parts[1].Trim() : "Верх";
+                DateTime lastUsed = DateTime.MinValue;
+                if (parts.Length > 2 && DateTime.TryParse(parts[2], out var dt))
+                {
+                    lastUsed = dt;
+                }
+
+                AllExercises.Add(new ExerciseModel
+                {
+                    Name = name,
+                    Category = cat,
+                    LastUsedAt = lastUsed
+                });
+            }
+
+            ApplyExerciseFilter();
+            SelectedExerciseItem = FilteredExercises.FirstOrDefault();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Помилка завантаження вправ: {ex.Message}");
+        }
+    }
+
+    private void SaveExercisesToFile()
+    {
+        try
+        {
+            var lines = AllExercises.Select(e => $"{e.Name}|{e.Category}|{e.LastUsedAt:o}");
+            File.WriteAllLines(_filePath, lines);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Помилка збереження вправ: {ex.Message}");
+        }
+    }
+
+    [RelayCommand]
+    public void AddCustomExercise()
+    {
+        if (string.IsNullOrWhiteSpace(NewExerciseName)) return;
+
+        var name = NewExerciseName.Trim();
+        if (!AllExercises.Any(e => e.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
+        {
+            var newItem = new ExerciseModel
+            {
+                Name = name,
+                Category = NewExerciseCategory,
+                LastUsedAt = DateTime.Now
+            };
+
+            AllExercises.Add(newItem);
+            SaveExercisesToFile();
+            NewExerciseName = string.Empty;
+            ApplyExerciseFilter();
+            SelectedExerciseItem = newItem;
+        }
+    }
+
+    [RelayCommand]
+    public void RemoveExercise(ExerciseModel? item)
+    {
+        if (item == null) return;
+
+        if (AllExercises.Contains(item))
+        {
+            AllExercises.Remove(item);
+            SaveExercisesToFile();
+            ApplyExerciseFilter();
+
+            if (SelectedExerciseItem == item || SelectedExercise == item.Name)
+            {
+                SelectedExerciseItem = FilteredExercises.FirstOrDefault();
+            }
+        }
+    }
+
+    // --- ЛОГІКА СЕТІВ ТРЕНУВАННЯ ---
+    [RelayCommand]
+    public void AddToCurrentSet()
+    {
+        if (string.IsNullOrWhiteSpace(SelectedExercise) || SelectedExercise == "Виберіть вправу") return;
+
+        var currentSet = WorkoutSets.LastOrDefault(s => !s.IsClosed);
+        if (currentSet == null)
+        {
+            currentSet = new WorkoutSetModel();
+            WorkoutSets.Add(currentSet);
+        }
+
+        AddExerciseToSet(currentSet);
+        MarkExerciseAsUsed(SelectedExercise);
+        IsMenuOpen = false;
+        SaveAutosave();
+    }
+
+    [RelayCommand]
+    public void AddToNewSet()
+    {
+        if (string.IsNullOrWhiteSpace(SelectedExercise) || SelectedExercise == "Виберіть вправу") return;
+
+        var currentSet = WorkoutSets.LastOrDefault(s => !s.IsClosed);
+        if (currentSet != null) currentSet.IsClosed = true;
+
+        var newSet = new WorkoutSetModel();
+        WorkoutSets.Add(newSet);
+
+        AddExerciseToSet(newSet);
+        MarkExerciseAsUsed(SelectedExercise);
+        IsMenuOpen = false;
+        SaveAutosave();
+    }
+
+    private void AddExerciseToSet(WorkoutSetModel set)
+    {
+        set.Exercises.Add(new ExerciseModel
+        {
+            Name = SelectedExercise,
+            Reps = CurrentReps,
+            Notes = CurrentNotes,
+            RestSeconds = CurrentRest,
+            Category = SelectedExerciseItem?.Category ?? "Верх"
+        });
+        CurrentNotes = string.Empty;
+    }
+
+    [RelayCommand]
+    public void ToggleTimer()
+    {
+        if (IsTimerRunning)
+        {
+            _timer.Stop();
+            PlayPauseIcon = "▶";
+        }
+        else
+        {
+            _timer.Start();
+            PlayPauseIcon = "॥";
+        }
+        IsTimerRunning = !IsTimerRunning;
+    }
+
+    [RelayCommand]
+    public void SaveTimerToLastExercise()
+    {
+        _timer.Stop();
+        IsTimerRunning = false;
+        PlayPauseIcon = "▶";
+
+        var currentSet = WorkoutSets.LastOrDefault(s => !s.IsClosed);
+        var lastExercise = currentSet?.Exercises.LastOrDefault();
+        if (lastExercise != null)
+        {
+            lastExercise.RestSeconds = _elapsedSeconds;
+        }
+
+        _elapsedSeconds = 0;
+        TimerDisplay = "00:00";
+    }
+
+    [RelayCommand]
+    public void RequestFinishWorkout()
+    {
+        if (WorkoutSets.Any()) IsFinishDialogVisible = true;
+    }
+
+    [RelayCommand]
+    public void CancelFinishWorkout() => IsFinishDialogVisible = false;
+
+private HashSet<string> LoadActivityDates()
+    {
+        try
+        {
+            if (File.Exists(_activityLogFilePath))
+            {
+                string json = File.ReadAllText(_activityLogFilePath);
+                var set = JsonSerializer.Deserialize<HashSet<string>>(json);
+                if (set != null) return set;
+            }
+        }
+        catch { }
+        return new HashSet<string>();
+    }
+
+    private void RecordActivityDate(DateTime date)
+    {
+        try
+        {
+            var dates = LoadActivityDates();
+            dates.Add(date.ToString("yyyy-MM-dd"));
+            if (!Directory.Exists(_dataDirectory)) Directory.CreateDirectory(_dataDirectory);
+            string json = JsonSerializer.Serialize(dates, new JsonSerializerOptions { WriteIndented = true });
+            File.WriteAllText(_activityLogFilePath, json);
+        }
+        catch { }
+    }
+
+    public void BuildCalendar()
+    {
+        CurrentMonthDays.Clear();
+        var now = DateTime.Now;
+        var viewDate = _displayDate;
+
+        CurrentMonthTitle = viewDate.ToString("MMMM yyyy").ToUpper();
+
+        var workoutDates = LoadActivityDates();
+        var firstDayOfMonth = new DateTime(viewDate.Year, viewDate.Month, 1);
+        int daysInMonth = DateTime.DaysInMonth(viewDate.Year, viewDate.Month);
+
+        // Зміщення для першого дня місяця (0 = Пн ... 6 = Нд)
+        int leadOffset = ((int)firstDayOfMonth.DayOfWeek + 6) % 7;
+
+        var prevMonth = firstDayOfMonth.AddMonths(-1);
+        int daysInPrevMonth = DateTime.DaysInMonth(prevMonth.Year, prevMonth.Month);
+
+        // Хвостик попереднього місяця (буде сірим)
+        for (int i = leadOffset - 1; i >= 0; i--)
+        {
+            var d = new DateTime(prevMonth.Year, prevMonth.Month, daysInPrevMonth - i);
+            CurrentMonthDays.Add(new CalendarDayModel
+            {
+                DayNumber = d.Day,
+                Date = d,
+                HasWorkout = workoutDates.Contains(d.ToString("yyyy-MM-dd")),
+                IsToday = false,
+                IsCurrentMonth = false
+            });
+        }
+
+        // Дні обраного місяця
+        for (int day = 1; day <= daysInMonth; day++)
+        {
+            var d = new DateTime(viewDate.Year, viewDate.Month, day);
+            bool isRealToday = (viewDate.Year == now.Year && viewDate.Month == now.Month && day == now.Day);
+
+            CurrentMonthDays.Add(new CalendarDayModel
+            {
+                DayNumber = day,
+                Date = d,
+                HasWorkout = workoutDates.Contains(d.ToString("yyyy-MM-dd")),
+                IsToday = isRealToday,
+                IsCurrentMonth = true
+            });
+        }
+
+        // Хвостик наступного місяця (буде сірим)
+        int remainder = CurrentMonthDays.Count % 7;
+        if (remainder != 0)
+        {
+            int tailCount = 7 - remainder;
+            var nextMonth = firstDayOfMonth.AddMonths(1);
+            for (int day = 1; day <= tailCount; day++)
+            {
+                var d = new DateTime(nextMonth.Year, nextMonth.Month, day);
+                CurrentMonthDays.Add(new CalendarDayModel
+                {
+                    DayNumber = day,
+                    Date = d,
+                    HasWorkout = workoutDates.Contains(d.ToString("yyyy-MM-dd")),
+                    IsToday = false,
+                    IsCurrentMonth = false
+                });
+            }
+        }
+    }
+    [RelayCommand]
+    public void ConfirmFinishWorkout()
+    {
+        if (!WorkoutSets.Any()) return;
+
+        try
+        {
+            if (!Directory.Exists(_dataDirectory)) Directory.CreateDirectory(_dataDirectory);
+
+            string fileName = $"Workout_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.json";
+            string filePath = Path.Combine(_dataDirectory, fileName);
+
+            string json = JsonSerializer.Serialize(WorkoutSets, new JsonSerializerOptions { WriteIndented = true });
+            File.WriteAllText(filePath, json);
+            RecordActivityDate(DateTime.Now);
+            BuildCalendar();
+
+            DeleteAutosave();
+            WorkoutSets.Clear();
+            _elapsedSeconds = 0;
+            TimerDisplay = "00:00";
+            IsFinishDialogVisible = false;
+            IsWorkoutActive = false;
+
+            LoadHistory();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Помилка збереження: {ex.Message}");
         }
     }
 
@@ -144,11 +567,11 @@ public partial class MainWindowViewModel : ViewModelBase
                     {
                         WorkoutSets.Add(set);
                     }
-                    IsWorkoutActive = true; // Перемикаємо екран на тренування
+                    IsWorkoutActive = true;
                 }
             }
         }
-        catch 
+        catch
         {
             DeleteAutosave();
         }
@@ -158,243 +581,177 @@ public partial class MainWindowViewModel : ViewModelBase
     public void CancelRestoreWorkout()
     {
         IsAutosaveDialogVisible = false;
-        DeleteAutosave(); // Видаляємо стару чернетку, бо юзер відмовився
+        DeleteAutosave();
     }
 
     private void LoadHistory()
     {
         PastWorkouts.Clear();
-        string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "GAUGEData");
-        if (!Directory.Exists(path)) return;
+        if (!Directory.Exists(_dataDirectory)) return;
 
-        // Беремо 10 останніх тренувань (бо тепер у нас є скрол)
-        var files = Directory.GetFiles(path, "*.json").OrderByDescending(f => f).Take(10);
+        var files = Directory.GetFiles(_dataDirectory, "Workout_*.json").OrderByDescending(f => f).Take(10);
         foreach (var file in files)
         {
-            try 
+            try
             {
-                // Читаємо файл
                 string jsonString = File.ReadAllText(file);
                 var sets = JsonSerializer.Deserialize<ObservableCollection<WorkoutSetModel>>(jsonString);
 
                 if (sets == null || !sets.Any()) continue;
 
                 int totalSets = sets.Count;
-                
-                // Рахуємо суму повторень для кожної вправи (Магія LINQ)
                 var exerciseTotals = sets.SelectMany(s => s.Exercises)
                                          .GroupBy(e => e.Name)
                                          .Select(g => $"{g.Key}: {g.Sum(e => e.Reps)}")
                                          .ToList();
 
-                // Формуємо красивий текст (напр: "3 підходи • Віджимання: 13, Прес: 20")
                 string summary = $"{totalSets} підходів • {string.Join(", ", exerciseTotals)}";
 
-                PastWorkouts.Add(new WorkoutHistoryModel { 
-                    Title = "Тренування " + Path.GetFileNameWithoutExtension(file).Replace("Workout_", "").Replace("_", " "),
-                    Summary = summary
-                });
-            } 
-            catch 
-            {
-                // Якщо файл пошкоджений - просто пропускаємо його
-            }
-        }
-    }
-
-    public void RemoveExercise(string exerciseName)
-    {
-        if (Exercises.Contains(exerciseName))
-        {
-            try
-            {
-                Exercises.Remove(exerciseName); // Видаляємо з екрану
-            
-                // Перезаписуємо файл повністю, але вже без цієї вправи
-                File.WriteAllLines(_filePath, Exercises);
-            
-                // Якщо видалили вправу, яка була вибрана, скидаємо селектор на першу доступну
-                if (SelectedExercise == exerciseName)
+                PastWorkouts.Add(new WorkoutHistoryModel
                 {
-                    SelectedExercise = Exercises.FirstOrDefault() ?? string.Empty;
-                }
+                    Title = "Тренування " + Path.GetFileNameWithoutExtension(file).Replace("Workout_", "").Replace("_", " "),
+                    Summary = summary,
+                    FilePath = file
+                });
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Не вдалося видалити вправу: {ex.Message}");
-            }
+            catch { }
         }
     }
 
-    private void LoadExercisesFromFile()
+    [RelayCommand]
+    public void OpenWorkoutDetails(WorkoutHistoryModel historyItem)
     {
+        if (historyItem == null || string.IsNullOrWhiteSpace(historyItem.FilePath) || !File.Exists(historyItem.FilePath))
+            return;
+
         try
         {
-            // ПЕРЕВІРКА: Спочатку створюємо папку GAUGEData, якщо її нема
-            string directoryPath = Path.GetDirectoryName(_filePath)!;
-            if (!Directory.Exists(directoryPath))
+            string json = File.ReadAllText(historyItem.FilePath);
+            var sets = JsonSerializer.Deserialize<ObservableCollection<WorkoutSetModel>>(json);
+            if (sets != null)
             {
-                Directory.CreateDirectory(directoryPath);
-            }
-
-            // Якщо файлу ще немає, створюємо базу
-            if (!File.Exists(_filePath))
-            {
-                var defaultExercises = new[] { "Підтягування на турніку", "Віджимання на брусах", "Бій з тінню", "Робота на мішку", "Присідання" };
-                File.WriteAllLines(_filePath, defaultExercises);
-            }
-
-            var lines = File.ReadAllLines(_filePath);
-            Exercises.Clear();
-            foreach (var line in lines.Where(l => !string.IsNullOrWhiteSpace(l)))
-            {
-                Exercises.Add(line.Trim());
+                DetailsSets.Clear();
+                foreach (var set in sets) DetailsSets.Add(set);
+                DetailsTitle = historyItem.Title;
+                _currentDetailsFilePath = historyItem.FilePath;
+                IsWorkoutDetailsVisible = true;
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Помилка сховища: {ex.Message}");
+            Console.WriteLine($"Помилка завантаження деталей: {ex.Message}");
         }
     }
 
-    public void AddCustomExercise()
+    [RelayCommand]
+    public void CloseWorkoutDetails()
     {
-        if (string.IsNullOrWhiteSpace(NewExerciseName)) return;
+        IsWorkoutDetailsVisible = false;
+        DetailsSets.Clear();
+    }
 
-        var name = NewExerciseName.Trim();
-        if (!Exercises.Contains(name))
+    [RelayCommand]
+    public async Task ExportCurrentDetailsToMarkdown()
+    {
+        if (!DetailsSets.Any()) return;
+
+        var storageProvider = GetStorageProvider();
+        if (storageProvider == null) return;
+
+        var file = await storageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
         {
-            try
+            Title = "Експорт тренування в Obsidian",
+            DefaultExtension = "md",
+            SuggestedFileName = $"{DetailsTitle.Replace(" ", "_")}.md",
+            FileTypeChoices = new[]
             {
-                Exercises.Add(name); // Додаємо на екран
-                File.AppendAllLines(_filePath, new[] { name }); // Зберігаємо у файл
-                NewExerciseName = string.Empty; // Очищаємо поле
+                new FilePickerFileType("Markdown") { Patterns = new[] { "*.md" } }
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Не вдалося записати: {ex.Message}");
-            }
+        });
+
+        if (file != null)
+        {
+            string md = MarkdownExportService.GenerateWorkoutMarkdown(DetailsTitle, DetailsSets);
+            await using var stream = await file.OpenWriteAsync();
+            await using var writer = new StreamWriter(stream, Encoding.UTF8);
+            await writer.WriteAsync(md);
         }
     }
 
-    // Шлях до ізольованого файлу на телефоні/Маку
-    // Тепер список вправ живе в тій самій спільній папці, що й історія!
-    private readonly string _filePath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), 
-        "GAUGEData", 
-        "exercises_list.txt"
-    );
-
-    // Колекція вправ для випадаючого списку
-    public ObservableCollection<string> Exercises { get; set; } = new ObservableCollection<string>();
-
-    private string _newExerciseName = string.Empty;
-    public string NewExerciseName
+    private IStorageProvider? GetStorageProvider()
     {
-        get => _newExerciseName;
-        set 
-        { 
-            _newExerciseName = value; 
-            OnPropertyChanged(nameof(NewExerciseName)); 
+        var app = Avalonia.Application.Current;
+        if (app?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
+            return desktop.MainWindow?.StorageProvider;
+        if (app?.ApplicationLifetime is ISingleViewApplicationLifetime singleView)
+            return Avalonia.Controls.TopLevel.GetTopLevel(singleView.MainView)?.StorageProvider;
+        return null;
+    }
+
+    // --- БАТЧ-ЕКСПОРТ (ВИПРАВЛЕНИЙ) ---
+    [RelayCommand]
+    public void OpenExportMenuCommand()
+    {
+        AvailableWorkouts.Clear();
+        if (Directory.Exists(_dataDirectory))
+        {
+            var files = Directory.GetFiles(_dataDirectory, "Workout_*.json")
+                                 .OrderByDescending(f => f)
+                                 .ToArray();
+
+            foreach (var file in files)
+            {
+                AvailableWorkouts.Add(new ExportItem
+                {
+                    FileName = Path.GetFileName(file),
+                    IsSelected = true
+                });
+            }
         }
+        IsExportDialogVisible = true;
     }
-
-    // --- ЛОГІКА ТРЕНУВАННЯ ---
-    [RelayCommand]
-    public void ToggleTimer()
-    {
-        if (IsTimerRunning) { _timer.Stop(); PlayPauseIcon = "▶"; }
-        else { _timer.Start(); PlayPauseIcon = "॥"; }
-        IsTimerRunning = !IsTimerRunning;
-    }
-
-    [RelayCommand]
-    public void SaveTimerToLastExercise()
-    {
-        _timer.Stop(); IsTimerRunning = false; PlayPauseIcon = "▶";
-        var currentSet = WorkoutSets.LastOrDefault(s => !s.IsClosed);
-        var lastExercise = currentSet?.Exercises.LastOrDefault();
-        if (lastExercise != null) lastExercise.RestSeconds = _elapsedSeconds;
-        _elapsedSeconds = 0; TimerDisplay = "00:00";
-    }
-
-    [RelayCommand]
-    public void AddToCurrentSet()
-    {
-        var currentSet = WorkoutSets.LastOrDefault(s => !s.IsClosed);
-        if (currentSet == null) { currentSet = new WorkoutSetModel(); WorkoutSets.Add(currentSet); }
-        AddExerciseToSet(currentSet); IsMenuOpen = false; 
-
-        SaveAutosave();
-    }
-
-    [RelayCommand]
-    public void AddToNewSet()
-    {
-        var currentSet = WorkoutSets.LastOrDefault(s => !s.IsClosed);
-        if (currentSet != null) currentSet.IsClosed = true; 
-        var newSet = new WorkoutSetModel(); WorkoutSets.Add(newSet);
-        AddExerciseToSet(newSet); IsMenuOpen = false; 
-        SaveAutosave();
-    }
-
-    private void AddExerciseToSet(WorkoutSetModel set)
-    {
-        set.Exercises.Add(new ExerciseModel { Name = SelectedExercise, Reps = CurrentReps, Notes = CurrentNotes, RestSeconds = CurrentRest });
-        CurrentNotes = string.Empty; 
-    }
-
-    [RelayCommand] public void RequestFinishWorkout() { if (WorkoutSets.Any()) IsFinishDialogVisible = true; }
-    [RelayCommand] public void CancelFinishWorkout() => IsFinishDialogVisible = false;
 
     [RelayCommand]
     public async Task ConfirmExportCommand()
     {
-        var lifetime = Avalonia.Application.Current?.ApplicationLifetime as Avalonia.Controls.ApplicationLifetimes.ISingleViewApplicationLifetime;
-        var topLevel = Avalonia.Controls.TopLevel.GetTopLevel(lifetime?.MainView);
-        if (topLevel == null) return;
-        var storageProvider = topLevel.StorageProvider;
+        var storageProvider = GetStorageProvider();
+        if (storageProvider == null) return;
 
-        var folders = await storageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions 
-        { 
-            Title = "Select Export Folder", 
-            AllowMultiple = false 
+        var folders = await storageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+        {
+            Title = "Виберіть папку для експорту вправ",
+            AllowMultiple = false
         });
 
         if (folders != null && folders.Count > 0)
         {
             string targetFolderPath = folders[0].TryGetLocalPath() ?? folders[0].Path.LocalPath;
-            
-            // Now loop through AvailableWorkouts where IsSelected == true and copy files to targetFolderPath
+
             foreach (var item in AvailableWorkouts.Where(i => i.IsSelected))
             {
-                string sourceFile = Path.Combine(Environment.GetFolderPath(item.FileName.Contains(".json") ? Environment.SpecialFolder.LocalApplicationData : Environment.SpecialFolder.Personal), item.FileName);
-                string destinationFile = Path.Combine(targetFolderPath, item.FileName);
-
-                File.Copy(sourceFile, destinationFile, true);
-            }
-
-            IsExportDialogVisible = false;
-        }
-    }
-
-    [RelayCommand]
-    public void OpenExportMenuCommand()
-    {
-        AvailableWorkouts.Clear();
-        string[] directories = { Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), Environment.GetFolderPath(Environment.SpecialFolder.Personal) };
-        foreach (var dir in directories)
-        {
-            if (Directory.Exists(dir))
-            {
-                var files = Directory.GetFiles(dir, "*.json").Concat(Directory.GetFiles(dir, "*.md")).ToArray();
-                foreach (var file in files)
+                string sourceJsonPath = Path.Combine(_dataDirectory, item.FileName);
+                if (File.Exists(sourceJsonPath))
                 {
-                    AvailableWorkouts.Add(new ExportItem { FileName = Path.GetFileName(file), IsSelected = true });
+                    try
+                    {
+                        // Експортуємо і сирий JSON, і згенерований Markdown
+                        string json = File.ReadAllText(sourceJsonPath);
+                        var sets = JsonSerializer.Deserialize<ObservableCollection<WorkoutSetModel>>(json);
+
+                        if (sets != null)
+                        {
+                            string title = Path.GetFileNameWithoutExtension(item.FileName).Replace("Workout_", "Тренування ");
+                            string md = MarkdownExportService.GenerateWorkoutMarkdown(title, sets);
+
+                            string targetMdPath = Path.Combine(targetFolderPath, $"{Path.GetFileNameWithoutExtension(item.FileName)}.md");
+                            File.WriteAllText(targetMdPath, md, Encoding.UTF8);
+                        }
+                    }
+                    catch { }
                 }
             }
+            IsExportDialogVisible = false;
         }
-        IsExportDialogVisible = true;
     }
 
     [RelayCommand]
@@ -402,4 +759,26 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         IsExportDialogVisible = false;
     }
+[RelayCommand]
+public void CycleExerciseCategory(ExerciseModel? item)
+{
+    if (item == null) return;
+
+    // Циклічно змінюємо категорію при кліку на бейдж
+    item.Category = item.Category switch
+    {
+        "Верх" => "Кор",
+        "Кор" => "Ноги",
+        _ => "Верх"
+    };
+
+    SaveExercisesToFile();
+    ApplyExerciseFilter();
+}
+
+[RelayCommand]
+public void SetNewExerciseCategory(string category)
+{
+    NewExerciseCategory = category;
+}
 }

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+          package="com.caesarvladyslav.GAUGE"
+          android:versionCode="3"
+          android:versionName="1.1-debug">
+    <uses-sdk android:minSdkVersion="21" android:targetSdkVersion="34" />
+    <application android:label="GAUGE" 
+                 android:icon="@drawable/icon"
+                 android:allowBackup="true"
+                 android:debuggable="true">
+    </application>
+</manifest>

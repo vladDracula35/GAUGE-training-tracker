@@ -1,0 +1,11 @@
+﻿<Solution>
+  <Project Path="GAUGE.Android/GAUGE.Android.csproj">
+    <Deploy />
+  </Project>
+  <Project Path="GAUGE.Browser/GAUGE.Browser.csproj" />
+  <Project Path="GAUGE.Desktop/GAUGE.Desktop.csproj" />
+  <Project Path="GAUGE.iOS/GAUGE.iOS.csproj">
+    <Deploy />
+  </Project>
+  <Project Path="GAUGE/GAUGE.csproj" />
+</Solution>

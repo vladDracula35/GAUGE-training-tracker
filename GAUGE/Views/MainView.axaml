@@ -1,0 +1,12 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GAUGE.ViewModels"
+             xmlns:views="using:GAUGE.Views"
+             x:DataType="vm:MainWindowViewModel"
+             x:Class="GAUGE.Views.MainView">
+
+    <Panel>
+        <views:HomeView IsVisible="{Binding !IsWorkoutActive}" />
+        <views:WorkoutView IsVisible="{Binding IsWorkoutActive}" />
+    </Panel>
+</UserControl>

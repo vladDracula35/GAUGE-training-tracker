@@ -1,0 +1,2 @@
+mkdir -p GAUGE.Android/Resources/drawable
+find . -maxdepth 3 -name "splash.xml" -not -path "*/Resources/drawable/*" -exec cp {} GAUGE.Android/Resources/drawable/splash.xml \;

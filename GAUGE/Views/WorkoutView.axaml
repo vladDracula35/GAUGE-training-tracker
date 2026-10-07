@@ -1,0 +1,288 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GAUGE.ViewModels"
+             x:DataType="vm:MainWindowViewModel"
+             x:Class="GAUGE.Views.WorkoutView">
+    
+    <UserControl.Styles>
+        <Style Selector="Button.sub-btn">
+            <Setter Property="Opacity" Value="0"/>
+            <Setter Property="RenderTransform" Value="translateX(0px) translateY(0px) scale(0.5)"/>
+            <Setter Property="Transitions"><Transitions><DoubleTransition Property="Opacity" Duration="0:0:0.2"/><TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.4" Easing="CubicEaseInOut"/></Transitions></Setter>
+        </Style>
+        <Style Selector="Grid.open Button.sub-left"><Setter Property="Opacity" Value="1"/><Setter Property="RenderTransform" Value="translateX(-65px) translateY(65px) scale(1)"/></Style>
+        <Style Selector="Grid.open Button.sub-right"><Setter Property="Opacity" Value="1"/><Setter Property="RenderTransform" Value="translateX(65px) translateY(65px) scale(1)"/></Style>
+        <Style Selector="Button.sub-btn Path"><Setter Property="RenderTransform" Value="rotate(0deg)"/><Setter Property="Transitions"><Transitions><TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.4" Easing="CubicEaseInOut"/></Transitions></Setter></Style>
+        <Style Selector="Grid.open Button.sub-left Path"><Setter Property="RenderTransform" Value="rotate(-360deg)"/></Style>
+        <Style Selector="Grid.open Button.sub-right Path"><Setter Property="RenderTransform" Value="rotate(360deg)"/></Style>
+        <Style Selector="ToggleButton Path"><Setter Property="RenderTransform" Value="rotate(0deg)"/><Setter Property="Transitions"><Transitions><TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.3" Easing="CubicEaseInOut"/></Transitions></Setter></Style>
+        <Style Selector="ToggleButton:checked Path"><Setter Property="RenderTransform" Value="rotate(45deg)"/></Style>
+        <Style Selector="Slider Thumb"><Setter Property="Width" Value="32"/><Setter Property="Height" Value="32"/><Setter Property="Background" Value="Transparent"/><Setter Property="ClipToBounds" Value="False"/><Setter Property="Template"><ControlTemplate><Image Source="avares://GAUGE/Assets/slider_thumb.png" Width="32" Height="32" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center"/></ControlTemplate></Setter></Style>
+        <Style Selector="Button#FinishBtn"><Setter Property="Opacity" Value="1"/><Setter Property="IsHitTestVisible" Value="True"/><Setter Property="Transitions"><Transitions><DoubleTransition Property="Opacity" Duration="0:0:0.2"/></Transitions></Setter></Style>
+        <Style Selector="Button#FinishBtn.hidden"><Setter Property="Opacity" Value="0"/><Setter Property="IsHitTestVisible" Value="False"/></Style>
+        <Style Selector="Border.closed"><Setter Property="Opacity" Value="0.4"/></Style>
+    </UserControl.Styles>
+
+    <Panel Background="Transparent" Focusable="True">
+        <ScrollViewer Focusable="True" ClipToBounds="False">
+            <StackPanel Spacing="25" Margin="20,40,20,100"> 
+                
+                <Border Background="#2A2A2A" CornerRadius="40" Padding="20,35" BorderBrush="#404040" BorderThickness="1">
+                    <TextBlock Text="ТУТ БУДЕ ЗАГОЛОВОК ЯКИЙ ПРИДУМАВ ШІ" Foreground="#FFFFFF" FontSize="20" FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap"/>
+                </Border>
+
+                <ItemsControl ItemsSource="{Binding WorkoutSets}">
+                    <ItemsControl.ItemTemplate><DataTemplate>
+                        <Border Background="#222222" CornerRadius="20" Padding="15" Margin="0,0,0,15" Classes.closed="{Binding IsClosed}">
+                            <StackPanel>
+                                <TextBlock Text="ПІДХІД" Foreground="#6A6A6A" FontSize="12" FontWeight="Bold" Margin="0,0,0,10" HorizontalAlignment="Center"/>
+                                <ItemsControl ItemsSource="{Binding Exercises}">
+                                    <ItemsControl.ItemTemplate><DataTemplate>
+                                        <Grid ColumnDefinitions="*, Auto, Auto" Margin="0,5">
+                                            <TextBlock Grid.Column="0" Text="{Binding Name}" Foreground="#e3dad1" FontWeight="Medium"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding Reps, StringFormat={}{0} повт.}" Foreground="#8C2424" Margin="15,0" FontWeight="Bold"/>
+                                            <TextBlock Grid.Column="2" Text="{Binding RestSeconds, StringFormat={}{0}s}" Foreground="#2B4E2B" FontWeight="Bold"/>
+                                        </Grid>
+                                    </DataTemplate></ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate></ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <StackPanel Spacing="10" Margin="10,0,10,0">
+                    <Grid ColumnDefinitions="*, Auto">
+                        
+                        <Expander Grid.Column="0"
+                                  HorizontalAlignment="Stretch"
+                                  Margin="0,0,15,0"
+                                  Background="#2A2A2A"
+                                  Foreground="White"
+                                  CornerRadius="10">
+                            <Expander.Header>
+                                <TextBlock Text="{Binding SelectedExercise, FallbackValue='Виберіть вправу'}" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                            </Expander.Header>
+                            <StackPanel Spacing="10" Margin="0,5,0,0">
+                                
+                                <!-- Рядок швидкого пошуку -->
+                                <TextBox Watermark="🔍 Пошук вправи..." 
+                                         Text="{Binding SearchExerciseText, Mode=TwoWay}" 
+                                         CornerRadius="10"
+                                         Background="#1E1E1E"
+                                         Foreground="White"
+                                         BorderThickness="1"
+                                         BorderBrush="#404040"
+                                         Padding="12,8"/>
+
+                                <!-- Фільтри-таби за категоріями -->
+                                <Grid ColumnDefinitions="*, *, *, *" Margin="0,2">
+                                    <Button Grid.Column="0" Content="Всі" 
+                                            Command="{Binding SelectCategoryCommand}" CommandParameter="Всі"
+                                            Background="#3A3A3A" Foreground="White" FontSize="11" FontWeight="Bold"
+                                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" CornerRadius="8" Margin="2,0"/>
+                                    <Button Grid.Column="1" Content="Верх" 
+                                            Command="{Binding SelectCategoryCommand}" CommandParameter="Верх"
+                                            Background="#3A3A3A" Foreground="White" FontSize="11" FontWeight="Bold"
+                                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" CornerRadius="8" Margin="2,0"/>
+                                    <Button Grid.Column="2" Content="Кор" 
+                                            Command="{Binding SelectCategoryCommand}" CommandParameter="Кор"
+                                            Background="#3A3A3A" Foreground="White" FontSize="11" FontWeight="Bold"
+                                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" CornerRadius="8" Margin="2,0"/>
+                                    <Button Grid.Column="3" Content="Ноги" 
+                                            Command="{Binding SelectCategoryCommand}" CommandParameter="Ноги"
+                                            Background="#3A3A3A" Foreground="White" FontSize="11" FontWeight="Bold"
+                                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" CornerRadius="8" Margin="2,0"/>
+                                </Grid>
+
+                                <!-- Вибір категорії для нової вправи -->
+                                <Grid ColumnDefinitions="*, *, *" Margin="0,2">
+                                    <Button Grid.Column="0" Content="Нова: Верх" 
+                                            Command="{Binding SetNewExerciseCategoryCommand}" CommandParameter="Верх"
+                                            Background="#2B2B2B" Foreground="#B0B0B0" FontSize="10" FontWeight="Bold"
+                                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" CornerRadius="6" Margin="1,0"/>
+                                    <Button Grid.Column="1" Content="Нова: Кор" 
+                                            Command="{Binding SetNewExerciseCategoryCommand}" CommandParameter="Кор"
+                                            Background="#2B2B2B" Foreground="#B0B0B0" FontSize="10" FontWeight="Bold"
+                                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" CornerRadius="6" Margin="1,0"/>
+                                    <Button Grid.Column="2" Content="Нова: Ноги" 
+                                            Command="{Binding SetNewExerciseCategoryCommand}" CommandParameter="Ноги"
+                                            Background="#2B2B2B" Foreground="#B0B0B0" FontSize="10" FontWeight="Bold"
+                                            HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" CornerRadius="6" Margin="1,0"/>
+                                </Grid>
+
+                                <!-- Введення назви нової вправи та кнопка створення -->
+                                <Grid ColumnDefinitions="*, Auto" Margin="0,2,0,0">
+                                    <TextBox Watermark="Нова вправа..." 
+                                             Text="{Binding NewExerciseName, Mode=TwoWay}" 
+                                             CornerRadius="10"
+                                             Background="#3A3A3A"
+                                             Foreground="White"
+                                             BorderThickness="0"
+                                             Padding="15,10"/>
+                                    
+                                    <Button Grid.Column="1" Content="+" 
+                                            Command="{Binding AddCustomExerciseCommand}" 
+                                            Background="#4A1C1C" 
+                                            Foreground="White" 
+                                            FontWeight="ExtraBold"
+                                            FontSize="20"
+                                            Width="45" 
+                                            Height="45"
+                                            HorizontalContentAlignment="Center"
+                                            VerticalContentAlignment="Center"
+                                            CornerRadius="10"
+                                            Margin="10,0,0,0"/>
+                                </Grid>
+
+                                <!-- Список вправ із сортуванням та клікабельними бейджами категорій -->
+                                <ListBox ItemsSource="{Binding FilteredExercises}" 
+                                         SelectedItem="{Binding SelectedExerciseItem, Mode=TwoWay}"
+                                         Background="#1E1E1E"
+                                         Foreground="White"
+                                         MaxHeight="220"
+                                         CornerRadius="10">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid ColumnDefinitions="*, Auto, Auto" Margin="5,4">
+                                                <TextBlock Grid.Column="0" 
+                                                           Text="{Binding Name}" 
+                                                           FontSize="15" 
+                                                           VerticalAlignment="Center" 
+                                                           Foreground="#e3dad1"/>
+                                                
+                                                <Button Grid.Column="1" 
+                                                        Content="{Binding Category}"
+                                                        Command="{Binding $parent[UserControl].((vm:MainWindowViewModel)DataContext).CycleExerciseCategoryCommand}"
+                                                        CommandParameter="{Binding}"
+                                                        Background="#2A2A2A" 
+                                                        Foreground="#00E5FF" 
+                                                        FontSize="11" 
+                                                        FontWeight="Bold"
+                                                        CornerRadius="6" 
+                                                        Padding="8,3" 
+                                                        Margin="8,0" 
+                                                        VerticalAlignment="Center"/>
+
+                                                <Button Grid.Column="2" 
+                                                        Content="✕" 
+                                                        Command="{Binding $parent[UserControl].((vm:MainWindowViewModel)DataContext).RemoveExerciseCommand}" 
+                                                        CommandParameter="{Binding}"
+                                                        Background="Transparent" 
+                                                        Foreground="#800020" 
+                                                        FontWeight="Bold"
+                                                        FontSize="14"
+                                                        Padding="8,4"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </StackPanel>
+                        </Expander>
+
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
+                            <TextBox Text="{Binding CurrentReps, Mode=TwoWay}" 
+                                     Width="70" 
+                                     Height="45"
+                                     Background="#3A3A3A" 
+                                     Foreground="White" 
+                                     BorderThickness="0" 
+                                     TextAlignment="Center" 
+                                     VerticalContentAlignment="Center"
+                                     CornerRadius="10"/>
+                            <TextBlock Text="шт" Foreground="#888888" FontSize="16" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Grid>
+                    
+                    <Slider Name="RepSlider" Minimum="0" Maximum="100" Value="{Binding CurrentReps}" Foreground="#800020" Margin="0,0,0,0"/>
+                </StackPanel>
+
+                <TextBox MinHeight="70" CornerRadius="20" Background="#3A3A3A" Foreground="White" BorderThickness="0" Watermark="Відчуття після вправи..." TextWrapping="Wrap" AcceptsReturn="True" Padding="15" Text="{Binding CurrentNotes}"/>
+
+                <StackPanel Spacing="10">
+                    <Grid ColumnDefinitions="*, Auto">
+                        <TextBlock Grid.Column="0" Text="Час відпочинку" Foreground="#FFFFFF" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                            <TextBox Text="{Binding CurrentRest, Mode=TwoWay}" 
+                                     Width="70" 
+                                     Background="#3A3A3A" 
+                                     Foreground="White" 
+                                     BorderThickness="0" 
+                                     TextAlignment="Center" 
+                                     CornerRadius="10"/>
+                            <TextBlock Text="сек" Foreground="#888888" FontSize="16" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Grid>
+                    
+                    <Slider Name="RestSlider" Minimum="0" Maximum="300" Value="{Binding CurrentRest}" Foreground="#2B4E2B" Margin="10,0" />
+
+                    <Grid Height="140" Margin="0, 10, 0, 0">
+                        <Border Height="2" Background="#404040" VerticalAlignment="Center" Margin="-20,0"/>
+                        <Grid Classes.open="{Binding IsMenuOpen}" HorizontalAlignment="Center" VerticalAlignment="Center" ZIndex="10">
+                            <Button Classes="sub-btn sub-left" Width="60" Height="60" CornerRadius="30" Background="#4A1C1C" Command="{Binding AddToNewSetCommand}" ClickMode="Press">
+                                <Path Data="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z" Fill="#B55B5B" Stretch="Uniform" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Button>
+                            <Button Classes="sub-btn sub-right" Width="60" Height="60" CornerRadius="30" Background="#1C3A1C" Command="{Binding AddToCurrentSetCommand}" ClickMode="Press">
+                                <Path Data="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z" Fill="#5B9A5B" Stretch="Uniform" Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Button>
+                            <ToggleButton Name="MainBtn" Width="70" Height="70" CornerRadius="35" Background="Transparent" ZIndex="10" BorderThickness="0" IsChecked="{Binding IsMenuOpen, Mode=TwoWay}" ClickMode="Press">
+                                <Panel>
+                                    <Image Source="avares://GAUGE/Assets/glass_background.png" Stretch="Uniform" /> 
+                                    <Path Data="M60.0667 1.64691C60.4606 -0.548945 63.61 -0.548951 64.0039 1.64691L72.4785 48.8937C72.6274 49.7239 73.2812 50.3715 74.1128 50.5125L122.405 58.7001C124.626 59.0766 124.626 62.2673 122.405 62.6438L74.1128 70.8314C73.2812 70.9724 72.6274 71.6199 72.4785 72.4502L64.0039 119.697C63.61 121.893 60.4606 121.893 60.0667 119.697L51.592 72.4502C51.4431 71.6199 50.7894 70.9724 49.9578 70.8314L1.66568 62.6438C-0.555233 62.2673 -0.555229 59.0766 1.66568 58.7001L49.9578 50.5125C50.7894 50.3715 51.4431 49.7239 51.592 48.8937L60.0667 1.64691Z" Fill="#800020" Stretch="Uniform" Width="36" Height="36" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Panel>
+                            </ToggleButton>
+                        </Grid>
+                    </Grid>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Border Background="#EE1E1E1E" Height="400" VerticalAlignment="Top" ZIndex="100" IsVisible="{Binding IsRepOverlayVisible}">
+            <Grid RowDefinitions="Auto, *" Margin="20,60,20,40">
+                <TextBlock Grid.Row="0" Text="ПОВТОРЕННЯ" FontSize="26" Foreground="#888888" HorizontalAlignment="Center" FontWeight="Bold"/>
+                <Viewbox Grid.Row="1" Stretch="Uniform" Margin="0,10,0,0">
+                    <TextBlock Text="{Binding CurrentReps, StringFormat={}{0:0}}" Foreground="#800020" FontWeight="Black"/>
+                </Viewbox>
+            </Grid>
+        </Border>
+
+        <Border Background="#EE1E1E1E" Height="400" VerticalAlignment="Top" ZIndex="100" IsVisible="{Binding IsRestOverlayVisible}">
+            <Grid RowDefinitions="Auto, *" Margin="20,60,20,40">
+                <TextBlock Grid.Row="0" Text="ВІДПОЧИНОК (СЕК)" FontSize="26" Foreground="#888888" HorizontalAlignment="Center" FontWeight="Bold"/>
+                <Viewbox Grid.Row="1" Stretch="Uniform" Margin="0,10,0,0">
+                    <TextBlock Text="{Binding CurrentRest, StringFormat={}{0:0}}" Foreground="#2B4E2B" FontWeight="Black"/>
+                </Viewbox>
+            </Grid>
+        </Border>
+
+        <Button Name="FinishBtn" Width="75" Height="75" CornerRadius="38" Background="Transparent" BorderThickness="0" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,25,25" ZIndex="50" Classes.hidden="{Binding IsMenuOpen}" Command="{Binding RequestFinishWorkoutCommand}" ClickMode="Press">
+            <Panel>
+                <Image Source="avares://GAUGE/Assets/finish.png" Stretch="Uniform" />
+                <Viewbox Width="30" Height="30" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Canvas Width="92" Height="128"><Line StartPoint="10.3448,64.3422" EndPoint="43.3422,116.655" Stroke="#0EFF0A" StrokeThickness="15" StrokeLineCap="Round" StrokeJoin="Round"/><Line StartPoint="84.4916,9.60862" EndPoint="44.6086,119.508" Stroke="#0EFF0A" StrokeThickness="15" StrokeLineCap="Round" StrokeJoin="Round"/></Canvas>
+                </Viewbox>
+            </Panel>
+        </Button>
+
+        <StackPanel HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="25,0,0,25" ZIndex="50" Spacing="5" Classes.hidden="{Binding IsMenuOpen}">
+            <TextBlock Text="{Binding TimerDisplay}" Foreground="#e3dad1" FontSize="52" FontWeight="Black" HorizontalAlignment="Center"/>
+            <StackPanel Orientation="Horizontal" Spacing="15" HorizontalAlignment="Center">
+                <Button Width="56" Height="56" CornerRadius="28" Background="#2A2A2A" Command="{Binding ToggleTimerCommand}" ClickMode="Press"><TextBlock Text="{Binding PlayPauseIcon}" Foreground="White" FontSize="20" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="2,0,0,0"/></Button>
+                <Button Width="56" Height="56" CornerRadius="28" Background="#1C3A1C" Command="{Binding SaveTimerToLastExerciseCommand}" ClickMode="Press"><TextBlock Text="↓" Foreground="#5B9A5B" FontSize="24" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center"/></Button>
+            </StackPanel>
+        </StackPanel>
+
+        <Border ZIndex="1000" Background="#E6000000" IsVisible="{Binding IsFinishDialogVisible}">
+            <Border Background="#2A2A2A" CornerRadius="40" Padding="30" HorizontalAlignment="Stretch" VerticalAlignment="Center" BorderBrush="#404040" BorderThickness="1" Margin="30">
+                <StackPanel Spacing="35">
+                    <TextBlock Text="ЗАВЕРШИТИ?" FontSize="36" FontWeight="Black" Foreground="#FFFFFF" HorizontalAlignment="Center"/>
+                    <Grid ColumnDefinitions="*, 20, *">
+                        <Button Grid.Column="0" Height="80" CornerRadius="20" Background="#800020" Command="{Binding CancelFinishWorkoutCommand}" ClickMode="Press" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"><TextBlock Text="НІ" FontSize="28" FontWeight="Bold" Foreground="White"/></Button>
+                        <Button Grid.Column="2" Height="80" CornerRadius="20" Background="#2B4E2B" Command="{Binding ConfirmFinishWorkoutCommand}" ClickMode="Press" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"><TextBlock Text="ТАК" FontSize="28" FontWeight="Bold" Foreground="White"/></Button>
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </Border>
+
+    </Panel>
+</UserControl>
